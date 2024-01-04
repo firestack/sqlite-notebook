@@ -55,7 +55,7 @@
               };
 
               kernelJsonPath = lib.mkOption {
-                type = lib.types.string;
+                type = lib.types.path;
                 default = "/share/jupyter/kernels/sqlite-notebook/kernel.json";
               };
 
