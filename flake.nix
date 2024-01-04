@@ -40,15 +40,60 @@
             pkgs.valgrind
           ];
         };
-      }
-    ) // {
-      # TODO(someday): Remove this once https://github.com/NixOS/nixpkgs/pull/252995
-      # is merged upstream.
-      overlays.cre2 = final: prev: {
-        cre2 = prev.cre2.overrideAttrs (oldAttrs: {
-          buildInputs = builtins.filter (input: input.pname != "re2") oldAttrs.buildInputs;
-          propagatedBuildInputs = [ final.re2 ];
+
+        jupyterWithModules.default = self.jupyterWithModules.${system}.sqlite-notebook;
+        jupyterWithModules.sqlite-notebook = ({ lib, pkgs, config, ... }: let
+          cfg = config.kernel.sqlite;
+
+          sqliteKernelModule = ({ name, config, ... }: {
+            options = {
+              enable = lib.mkEnableOption "enable profile Sqlite Kernel `${name}`";
+
+              package = lib.mkOption {
+                type = lib.types.package;
+                default = self.packages.${system}.default;
+              };
+
+              kernelJsonPath = lib.mkOption {
+                type = lib.types.string;
+                default = "/share/jupyter/kernels/sqlite-notebook/kernel.json";
+              };
+
+              build = lib.mkOption {
+                type = lib.types.package;
+                internal = true;
+              };
+            };
+
+            config = lib.mkIf (config.enable) {
+              build = pkgs.runCommand "${name}-jupyter-kernel"
+                {
+                  passthru = {
+                    kernelInstance.language = "sqlite";
+                    IS_JUPYTER_KERNEL = true;
+                  };
+                }
+                (lib.concatStringsSep "\n" [
+                  "mkdir -p $out/kernels/${name}"
+                  "cp -R ${config.package + config.kernelJsonPath} $out/kernels/${name}/kernel.json"
+                ]);
+            };
+          });
+        in {
+          options.kernel.sqlite = lib.mkOption {
+            type = lib.types.attrsOf (lib.types.submodule sqliteKernelModule);
+          };
+
+          # options.kernel.sqlite
         });
+      }) // {
+        # TODO(someday): Remove this once https://github.com/NixOS/nixpkgs/pull/252995
+        # is merged upstream.
+        overlays.cre2 = final: prev: {
+          cre2 = prev.cre2.overrideAttrs (oldAttrs: {
+            buildInputs = builtins.filter (input: input.pname != "re2") oldAttrs.buildInputs;
+            propagatedBuildInputs = [ final.re2 ];
+          });
+        };
       };
-    };
 }
